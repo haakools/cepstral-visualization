@@ -15,29 +15,30 @@ function App() {
         async function loadWasm() {
             try {
                 console.log('Starting WASM load...');
-                const Module = await import('./wasm/signal_processor.js');
-                console.log('Module imported:', Module);
+                // Import as ES module
+                const moduleFactory = await import('./wasm/signal_processor.js');
+                console.log('Module factory loaded:', moduleFactory);
 
-                console.log('Waiting for ready...');
-                await Module.ready;
-                console.log('Module ready');
+                // Initialize the module
+                const Module = await moduleFactory.default();
+                console.log('Module initialized:', Module);
 
-                console.log('Creating SignalProcessor...');
-                const processor = new Module.SignalProcessor();
-                console.log('Processor created:', processor);
+                if (!Module.SignalProcessor) {
+                    console.error('Available module properties:', Object.getOwnPropertyNames(Module));
+                    throw new Error('SignalProcessor not found in module');
+                }
 
+                // Create processor instance
+                processorRef.current = new Module.SignalProcessor();
                 setWasmModule(Module);
-                processorRef.current = processor;
-                console.log('WASM setup complete');
+                console.log('SignalProcessor created successfully');
             } catch (err) {
-                console.error('WASM loading error details:', {
-                    message: err.message,
-                    stack: err.stack,
-                    type: err.constructor.name
-                });
+                console.error('WASM loading error:', err);
                 setError('Failed to initialize audio processor: ' + err.message);
             }
         }
+
+
 
 
         loadWasm();
