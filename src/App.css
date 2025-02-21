@@ -1,37 +1,50 @@
-/* App.css */
 .container {
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
 }
 
-.error {
-  color: red;
-  margin: 10px 0;
-  padding: 10px;
-  border: 1px solid red;
-  border-radius: 4px;
+.spectrogram {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 400px;
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
 }
 
-.visualization {
-  margin: 20px 0;
-  min-height: 200px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  width: 40px;
 }
 
-.status {
-  margin-top: 20px;
-  color: #666;
+.bar {
+  width: 20px;
+  background: #2196f3;
+  transition: height 0.1s ease-out;
+  border-radius: 2px 2px 0 0;
 }
 
-button {
+.label {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.control-button {
+  display: block;
+  margin: 20px auto;
   padding: 10px 20px;
-  font-size: 16px;
+  border: none;
+  border-radius: 4px;
+  background: #2196f3;
+  color: white;
   cursor: pointer;
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.control-button:hover {
+  background: #1976d2;
 }
