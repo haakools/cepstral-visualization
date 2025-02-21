@@ -1,0 +1,37 @@
+/* App.css */
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.error {
+  color: red;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid red;
+  border-radius: 4px;
+}
+
+.visualization {
+  margin: 20px 0;
+  min-height: 200px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.status {
+  margin-top: 20px;
+  color: #666;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
