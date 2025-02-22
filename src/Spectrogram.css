@@ -1,0 +1,25 @@
+.spectrogram-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.control-button {
+  margin-bottom: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.spectrogram-canvas {
+  border: 1px solid #ddd;
+  background-color: #000;
+}
+
+.error-message {
+  color: red;
+  margin-top: 20px;
+  text-align: center;
+}

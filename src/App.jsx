@@ -6,182 +6,199 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [coefficients, setCoefficients] = useState(Array(13).fill(0));
+  const canvasRef = useRef(null);
   const audioContextRef = useRef(null);
   const processorRef = useRef(null);
   const analyzerRef = useRef(null);
   const sourceRef = useRef(null);
 
+  async function loadWasm() {
+    try {
+      console.log('Starting WASM load...');
+      const moduleFactory = await import('./wasm/signal_processor.js');
+      console.log('Module factory imported');
+      
+      const Module = await moduleFactory.default();
+      console.log('Module loaded successfully', Module);
 
-    async function loadWasm() {
-        try {
-            console.log('Starting WASM load...');
-            const moduleFactory = await import('./wasm/signal_processor.js');
-            const Module = await moduleFactory.default();
+      processorRef.current = new Module.SignalProcessor();
+      console.log('SignalProcessor created');
+      
+      setWasmModule(Module);
+      console.log('WASM module set in state');
+    } catch (err) {
+      console.error('FULL WASM loading error:', err);
+      setError(`Failed to initialize audio processor: ${err.message}
+        Stack: ${err.stack}`);
+    }
+  }
 
-            processorRef.current = new Module.SignalProcessor();
-            setWasmModule(Module);
-            console.log('SignalProcessor created successfully');
-        } catch (err) {
-            console.error('WASM loading error:', err);
-            setError('Failed to initialize audio processor: ' + err.message);
-        }
+  useEffect(() => {
+    console.log('Initial useEffect running');
+    loadWasm();
+    
+    // Setup canvas contexts
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.error('Canvas ref is null');
+      return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    // Initialize canvas with a background
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    return () => {
+      if (processorRef.current) {
+        processorRef.current.delete();
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Color generation similar to original script
+  const generateColors = (steps = 275) => {
+    const colors = [];
+    const frequency = Math.PI / steps;
+    const amplitude = 127;
+    const center = 128;
+    const slice = (Math.PI / 2) * 3.1;
+
+    const toRGBString = (v) => `rgba(${v},${v},${v},1)`;
+
+    for (let i = 0; i < steps; i++) {
+      const v = Math.floor((Math.sin((frequency * i) + slice) * amplitude + center));
+      colors.push(toRGBString(v));
     }
 
-    useEffect(() => {
-        loadWasm();
-        return () => {
-            if (processorRef.current) {
-                processorRef.current.delete();
-            }
-            if (audioContextRef.current) {
-                audioContextRef.current.close();
-            }
-        };
-    }, []);
+    return colors;
+  };
 
-    const processAudioFrame = () => {
-        if (!isProcessing || !processorRef.current || !analyzerRef.current) {
-            console.log('Skipping frame processing because:', {
-                isProcessing,
-                hasProcessor: !!processorRef.current,
-                hasAnalyzer: !!analyzerRef.current
-            });
-            return;
-        }
+  const colors = generateColors();
 
-        console.log('Getting audio data...');
-        const buffer = new Float32Array(analyzerRef.current.frequencyBinCount);
-        analyzerRef.current.getFloatTimeDomainData(buffer);
-        console.log('Buffer size:', buffer.length, 'First few samples:', buffer.slice(0, 5));
+  const getColor = (value) => {
+    const index = Math.min(Math.max(Math.floor(value), 0), colors.length - 1);
+    return colors[index];
+  };
+
+  const drawSpectrogram = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Create temporary canvas for scrolling
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+
+    // Store current canvas state in temp canvas
+    tempCtx.drawImage(canvas, 0, 0);
+
+    // Draw new column of data
+    for (let i = 0; i < coefficients.length; i++) {
+      // Scale coefficient to 0-255 range
+      const scaledValue = Math.min(Math.max(
+        Math.abs(coefficients[i]) / 500 * 255, 
+        0
+      ), 255);
+      
+      ctx.fillStyle = getColor(scaledValue);
+      ctx.fillRect(width - 1, height - i, 1, 1);
+    }
+
+    // Scroll canvas to the left
+    ctx.translate(-1, 0);
+    ctx.drawImage(tempCanvas, 0, 0);
+    
+    // Reset transformation
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  };
+
+  const startProcessing = async () => {
+    console.log('Start processing called');
+    if (!wasmModule) {
+      console.error('No WASM module available');
+      setError('WASM module not loaded');
+      return;
+    }
+
+    try {
+      console.log('Requesting microphone access...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('Microphone stream obtained');
+
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContextRef.current = audioContext;
+
+      const source = audioContext.createMediaStreamSource(stream);
+      sourceRef.current = source;
+
+      const analyzer = audioContext.createAnalyser();
+      analyzerRef.current = analyzer;
+      analyzer.fftSize = 2048;
+      source.connect(analyzer);
+
+      setIsProcessing(true);
+
+      const processLoop = () => {
+        const buffer = new Float32Array(analyzer.frequencyBinCount);
+        analyzer.getFloatTimeDomainData(buffer);
 
         try {
-            // Convert buffer to WASM vector
-            console.log('Converting to WASM vector...');
-            const inputVector = new wasmModule.FloatVector();
-            buffer.forEach(sample => inputVector.push_back(sample));
-            console.log('Input vector size:', inputVector.size());
+          const inputVector = new wasmModule.FloatVector();
+          buffer.forEach(sample => inputVector.push_back(sample));
 
-            // Process audio and get coefficients
-            console.log('Processing samples...');
-            const results = processorRef.current.processSamples(inputVector);
-            console.log('Got results:', results);
+          const results = processorRef.current.processSamples(inputVector);
 
-            setCoefficients(Array.from(results));
+          // Convert to regular array
+          const resultsArray = [];
+          for (let i = 0; i < results.size(); i++) {
+            resultsArray.push(results.get(i));
+          }
 
-            inputVector.delete();
+          if (resultsArray.length > 0) {
+            setCoefficients(resultsArray);
+            drawSpectrogram();
+          }
 
-            if (isProcessing) {
-                requestAnimationFrame(processAudioFrame);
-            }
+          inputVector.delete();
+          results.delete();
+
+          if (isProcessing) {
+            requestAnimationFrame(processLoop);
+          }
         } catch (err) {
-            console.error('Processing error:', err);
-            setError('Processing error occurred: ' + err.message);
-            setIsProcessing(false);
+          console.error('Processing error:', err);
+          setError('Processing error occurred: ' + err.message);
         }
-    };
+      };
 
+      // Start the processing loop
+      processLoop();
 
-    const startProcessing = async () => {
-        if (!wasmModule) {
-            console.log('No WASM module available');
-            return;
-        }
+    } catch (err) {
+      console.error('Error starting audio processing:', err);
+      setError('Failed to access microphone: ' + err.message);
+    }
+  };
 
-        try {
-            console.log('Requesting microphone access...');
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            console.log('Got microphone stream');
-
-            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            console.log('Created audio context');
-
-            sourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
-            console.log('Created media stream source');
-
-            analyzerRef.current = audioContextRef.current.createAnalyser();
-            console.log('Created analyzer');
-
-            analyzerRef.current.fftSize = 2048;
-            sourceRef.current.connect(analyzerRef.current);
-            console.log('Connected source to analyzer');
-
-            // Set processing state and immediately start processing
-            setIsProcessing(true);
-            console.log('Starting audio processing');
-
-            // Start the processing loop directly
-            const processLoop = () => {
-                const buffer = new Float32Array(analyzerRef.current.frequencyBinCount);
-                analyzerRef.current.getFloatTimeDomainData(buffer);
-
-                try {
-                    const inputVector = new wasmModule.FloatVector();
-                    buffer.forEach(sample => inputVector.push_back(sample));
-                    console.log('Sent vector size:', inputVector.size());
-
-                    const results = processorRef.current.processSamples(inputVector);
-                    console.log('Raw results:', results);
-
-                    // Convert to regular array
-                    const resultsArray = [];
-                    for (let i = 0; i < results.size(); i++) {
-                        resultsArray.push(results.get(i));
-                    }
-                    console.log('Converted results:', resultsArray);
-
-                    if (resultsArray.length > 0) {
-                        setCoefficients(resultsArray);
-                    }
-
-                    inputVector.delete();
-                    results.delete();  // Don't forget to clean up the WASM vector
-
-                    requestAnimationFrame(processLoop);
-                } catch (err) {
-                    console.error('Processing error:', err);
-                    setError('Processing error occurred: ' + err.message);
-                }
-            };
-
-
-
-
-            // Start the processing loop
-            processLoop();
-
-        } catch (err) {
-            console.error('Error starting audio processing:', err);
-            setError('Failed to access microphone: ' + err.message);
-        }
-    };
-
-
-
-    const stopProcessing = () => {
-        setIsProcessing(false);
-        if (sourceRef.current) {
-            sourceRef.current.disconnect();
-        }
-    };
-
-    const normalizeValue = (value, index) => {
-  // Special handling for different coefficient ranges
-  if (index === 0) {
-    // C0 (energy) has much larger range
-    return Math.min(Math.max((value / 500 + 1) * 50, 0), 100);
-  } else if (index === 1) {
-    // C1 has second largest range
-    return Math.min(Math.max((value / 150 + 1) * 50, 0), 100);
-  } else {
-    // Other coefficients have smaller ranges
-    return Math.min(Math.max((value / 50 + 1) * 50, 0), 100);
-  }
-};
-
+  const stopProcessing = () => {
+    setIsProcessing(false);
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+    }
+  };
 
   return (
     <div className="container">
-      <h1>Cepstral Coefficients</h1>
+      <h1>Cepstral Coefficients Spectrogram</h1>
       
       <button 
         onClick={isProcessing ? stopProcessing : startProcessing}
@@ -190,22 +207,16 @@ function App() {
         {isProcessing ? 'Stop' : 'Start'}
       </button>
 
-      <div className="spectrogram">
-        {coefficients.map((value, index) => (
-          <div key={index} className="bar-container">
-            <div 
-              className="bar" 
-              style={{
-                height: `${normalizeValue(value)}%`
-              }}
-            />
-            <span className="label">C{index}</span>
-          </div>
-        ))}
-      </div>
+      <canvas 
+        ref={canvasRef}
+        width={800}
+        height={300}
+        style={{ border: '1px solid #000', backgroundColor: 'black' }}
+      />
+
+      {error && <div className="error-message" style={{color: 'red'}}>{error}</div>}
     </div>
   );
 }
 
 export default App;
-
