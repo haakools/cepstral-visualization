@@ -1,130 +1,224 @@
-/* Updated styles for Cepstral Coefficient Visualization */
-
-/* Body and global styles */
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #1e1e1e;
-  color: #eee;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-}
-
-/* App container (full width) */
+/* Base styles */
 .app-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: #f0f4f8;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
-  width: 100%;
-  min-height: 100vh;
-}
-
-/* Content container (centered, max-width) */
-.content-container {
-  width: 100%;
-  max-width: 1200px;
   padding: 20px;
-  box-sizing: border-box;
 }
 
-/* Heading */
+.content-container {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  max-width: 1200px;
+  width: 100%;
+}
+
 h1 {
-  font-size: 28px;
-  margin-bottom: 20px;
   text-align: center;
+  margin-bottom: 20px;
+  color: #2d3748;
 }
 
-/* Control button */
+h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #4a5568;
+}
+
+/* Controls layout */
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.visualization-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 15px;
+  border: 1px solid #e2e8f0;
+}
+
+.control-section {
+  flex: 1;
+  min-width: 300px;
+}
+
+.threshold-controls,
+.sensitivity-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.control-group label {
+  min-width: 120px;
+  font-size: 14px;
+  color: #4a5568;
+}
+
+.control-group span {
+  min-width: 40px;
+  text-align: right;
+  font-size: 12px;
+  color: #718096;
+}
+
+/* Form controls */
 .control-button {
-  background-color: #2196f3;
+  background-color: #4299e1;
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 8px 16px;
   border-radius: 4px;
-  font-size: 16px;
   cursor: pointer;
+  font-size: 16px;
   transition: background-color 0.2s;
-  font-weight: 500;
-  display: block;
-  margin: 0 auto 20px auto;
-  min-width: 120px;
 }
 
 .control-button:hover {
-  background-color: #1976d2;
+  background-color: #3182ce;
 }
 
-.control-button:active {
-  background-color: #0d47a1;
+.reset-button {
+  background-color: #718096;
 }
 
-/* Error message */
-.error-message {
-  background-color: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
-  padding: 10px 15px;
-  margin: 15px auto;
+.reset-button:hover {
+  background-color: #4a5568;
+}
+
+input[type="range"] {
+  flex: 1;
+  height: 6px;
+}
+
+.preset-select {
+  padding: 6px 12px;
   border-radius: 4px;
-  border-left: 4px solid #dc3545;
+  border: 1px solid #e2e8f0;
+  background-color: white;
   font-size: 14px;
-  max-width: 600px;
 }
 
-/* Spectrogram container */
+/* Color legend */
+.color-legend {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  gap: 30px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.blue {
+  background-color: rgb(0, 0, 204);
+}
+
+.green {
+  background-color: rgb(0, 204, 0);
+}
+
+.red {
+  background-color: rgb(204, 0, 0);
+}
+
+.legend-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.legend-label {
+  font-weight: 500;
+  font-size: 14px;
+  color: #2d3748;
+}
+
+.legend-value {
+  font-size: 12px;
+  color: #718096;
+}
+
+/* Spectrogram */
 .spectrogram-container {
   width: 100%;
-  margin: 0 auto 5px auto;
-  border: 1px solid #444;
-  background-color: #000;
-  border-radius: 4px;
+  position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 5px;
+  background-color: #000;
 }
 
-/* Canvas */
 .spectrogram-canvas {
-  width: 100%;
-  height: 260px; /* Height for exactly 13 channels (20px per channel) */
   display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* Channel labels */
 .channel-labels {
   display: flex;
-  flex-direction: column;
-  position: relative;
-  width: 40px;
-  height: 260px;
-  margin-top: -260px; /* Overlay on the canvas height */
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 5px;
 }
 
 .channel-label {
-  height: 20px;
-  display: flex;
-  align-items: center;
-  padding-left: 5px;
+  text-align: center;
+  font-size: 12px;
+  color: #718096;
+  flex: 1;
+}
+
+/* Error message */
+.error-message {
+  background-color: #fed7d7;
+  color: #e53e3e;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border-left: 4px solid #e53e3e;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .content-container {
-    padding: 10px;
+  .visualization-controls {
+    flex-direction: column;
   }
   
-  h1 {
-    font-size: 24px;
+  .control-section {
+    width: 100%;
   }
   
-  .spectrogram-canvas {
-    height: 200px;
-  }
-  
-  .channel-labels {
-    height: 200px;
-    margin-top: -200px;
-  }
-  
-  .channel-label {
-    height: 15.38px;
+  .color-legend {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
   }
 }

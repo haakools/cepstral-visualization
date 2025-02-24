@@ -7,6 +7,18 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(true);
   const [error, setError] = useState(null);
   const [coefficients, setCoefficients] = useState(Array(13).fill(0));
+  
+  // Scaling thresholds for color transitions
+  const [lowMidThreshold, setLowMidThreshold] = useState(35); // threshold between low (blue) and mid (green)
+  const [midHighThreshold, setMidHighThreshold] = useState(65); // threshold between mid (green) and high (red)
+  
+  // Sensitivity controls for different coefficient bands
+  const [sensitivityC0, setSensitivityC0] = useState(500);
+  const [sensitivityC1, setSensitivityC1] = useState(150);
+  const [sensitivityOthers, setSensitivityOthers] = useState(50);
+  
+  // Global scaling factor to adjust overall sensitivity
+  const [globalScaling, setGlobalScaling] = useState(1.0);
 
   // Refs for audio processing
   const audioContextRef = useRef(null);
@@ -54,40 +66,69 @@ function App() {
     };
   }, []);
 
+  // Function to update the renderer with current visualization settings
+  const updateRenderer = () => {
+    if (!canvasRef.current) return;
+    
+    // Destroy existing renderer if it exists
+    if (rendererRef.current) {
+      rendererRef.current.destroy();
+    }
+    
+    // Fixed colors for low, mid, high
+    const colorLow = [0, 0, 0.8, 1]; // Blue
+    const colorMid = [0, 0.8, 0, 1]; // Green
+    const colorHigh = [0.8, 0, 0, 1]; // Red
+    
+    // Create new renderer with current settings
+    rendererRef.current = new WebGLSpectrogramRenderer(canvasRef.current, {
+      coefficientCount: 13,
+      historyLength: 300,
+      colorLow,
+      colorMid,
+      colorHigh,
+      minValue: 0,
+      maxValue: 100,
+      // Threshold values used in the renderer
+      thresholdLowMid: lowMidThreshold,
+      thresholdMidHigh: midHighThreshold,
+      normalizeFunction: (value, index) => {
+        // Apply global scaling to all values
+        value = value * globalScaling;
+        
+        if (index === 0) {
+          // C0 (energy) with adjustable sensitivity
+          return Math.min(Math.max((value / sensitivityC0 + 1) * 50, 0), 100);
+        } else if (index === 1) {
+          // C1 with adjustable sensitivity
+          return Math.min(Math.max((value / sensitivityC1 + 1) * 50, 0), 100);
+        } else {
+          // Other coefficients with adjustable sensitivity
+          return Math.min(Math.max((value / sensitivityOthers + 1) * 50, 0), 100);
+        }
+      }
+    });
+    
+    // Start the render loop
+    rendererRef.current.startRenderLoop();
+    
+    // Resize to fit container
+    const container = canvasRef.current.parentElement;
+    if (container) {
+      const { width } = container.getBoundingClientRect();
+      rendererRef.current.resize(width, canvasRef.current.height);
+    }
+  };
+
   // Initialize WebGL renderer once the canvas is available
   useEffect(() => {
     if (!canvasRef.current) return;
 
     try {
       console.log("Creating WebGL renderer...");
-      // Create the WebGL renderer with wider history
-      rendererRef.current = new WebGLSpectrogramRenderer(canvasRef.current, {
-        coefficientCount: 13,        // Exactly 13 channels in height
-        historyLength: 300,          // Much wider history (300 frames instead of 100)
-        colorLow: [0, 0, 0.8, 1],    // Dark blue for low values
-        colorMid: [0, 0.8, 0, 1],    // Green for mid values
-        colorHigh: [0.8, 0, 0, 1],   // Red for high values
-        minValue: 0,                 // Assuming normalized values range from 0-100
-        maxValue: 100,
-        // Use your existing normalization function
-        normalizeFunction: (value, index) => {
-          // This matches your existing normalizeValue function
-          if (index === 0) {
-            // C0 (energy) has much larger range
-            return Math.min(Math.max((value / 500 + 1) * 50, 0), 100);
-          } else if (index === 1) {
-            // C1 has second largest range
-            return Math.min(Math.max((value / 150 + 1) * 50, 0), 100);
-          } else {
-            // Other coefficients have smaller ranges
-            return Math.min(Math.max((value / 50 + 1) * 50, 0), 100);
-          }
-        }
-      });
+      // Create the WebGL renderer
+      updateRenderer();
       console.log("WebGL Created.");
-
-      // Start the render loop
-      rendererRef.current.startRenderLoop();
 
       // Handle window resize
       const handleResize = () => {
@@ -115,13 +156,20 @@ function App() {
     }
   }, [canvasRef]);
 
+  // Effect to update renderer when visualization settings change
+  useEffect(() => {
+    if (rendererRef.current) {
+      updateRenderer();
+    }
+  }, [lowMidThreshold, midHighThreshold, sensitivityC0, sensitivityC1, sensitivityOthers, globalScaling]);
+
   // Effect to handle the audio processing loop separately from the state
   useEffect(() => {
     // Start audio processing when component mounts
     if (isProcessing && !processingLoopRef.current) {
       startProcessing();
     }
-    
+
     // Clean up processing loop when component unmounts
     return () => {
       if (processingLoopRef.current) {
@@ -166,10 +214,10 @@ function App() {
       const processLoop = () => {
         // Always continue the loop unless component is unmounted
         processingLoopRef.current = requestAnimationFrame(processLoop);
-        
+
         // Skip processing if we're not supposed to be processing
         if (!isProcessing) return;
-        
+
         try {
           const buffer = new Float32Array(analyzerRef.current.frequencyBinCount);
           analyzerRef.current.getFloatTimeDomainData(buffer);
@@ -221,7 +269,7 @@ function App() {
 
   const stopProcessing = () => {
     setIsProcessing(false);
-    
+
     // Don't disconnect the source, just stop the loop
     if (processingLoopRef.current) {
       cancelAnimationFrame(processingLoopRef.current);
@@ -240,19 +288,188 @@ function App() {
     }
   };
 
+  // Preset configurations
+  const applyPreset = (preset) => {
+    if (preset === 'default') {
+      setLowMidThreshold(35);
+      setMidHighThreshold(65);
+      setSensitivityC0(500);
+      setSensitivityC1(150);
+      setSensitivityOthers(50);
+      setGlobalScaling(1.0);
+    } else if (preset === 'highSensitivity') {
+      setLowMidThreshold(25);
+      setMidHighThreshold(60);
+      setSensitivityC0(400);
+      setSensitivityC1(120);
+      setSensitivityOthers(40);
+      setGlobalScaling(1.2);
+    } else if (preset === 'lowSensitivity') {
+      setLowMidThreshold(40);
+      setMidHighThreshold(75);
+      setSensitivityC0(600);
+      setSensitivityC1(180);
+      setSensitivityOthers(60);
+      setGlobalScaling(0.8);
+    } else if (preset === 'lowerThresholds') {
+      setLowMidThreshold(20);
+      setMidHighThreshold(50);
+      setSensitivityC0(500);
+      setSensitivityC1(150);
+      setSensitivityOthers(50);
+      setGlobalScaling(1.0);
+    }
+  };
+
+  // Reset parameter values to default after microphone changes
+  const resetParameters = () => {
+    applyPreset('default');
+  };
+
   return (
     <div className="app-container">
       <div className="content-container">
         <h1>Cepstral Coefficients</h1>
 
-        <button
-          onClick={toggleProcessing}
-          className="control-button"
-        >
-          {isProcessing ? 'Stop' : 'Start'}
-        </button>
+        <div className="controls-row">
+          <button
+            onClick={toggleProcessing}
+            className="control-button"
+          >
+            {isProcessing ? 'Stop' : 'Start'}
+          </button>
+
+          {/* Presets dropdown */}
+          <div className="control-group">
+            <label>Presets:</label>
+            <select 
+              onChange={(e) => applyPreset(e.target.value)}
+              className="preset-select"
+            >
+              <option value="">Select a preset...</option>
+              <option value="default">Default</option>
+              <option value="highSensitivity">High Sensitivity</option>
+              <option value="lowSensitivity">Low Sensitivity</option>
+              <option value="lowerThresholds">Lower Thresholds</option>
+            </select>
+          </div>
+          
+          <button 
+            onClick={resetParameters}
+            className="control-button reset-button"
+          >
+            Reset
+          </button>
+        </div>
 
         {error && <div className="error-message">{error}</div>}
+
+        {/* Color Legend */}
+        <div className="color-legend">
+          <div className="legend-item">
+            <div className="color-swatch blue"></div>
+            <div className="legend-text">
+              <span className="legend-label">Low</span>
+              <span className="legend-value">0-{lowMidThreshold}%</span>
+            </div>
+          </div>
+          <div className="legend-item">
+            <div className="color-swatch green"></div>
+            <div className="legend-text">
+              <span className="legend-label">Mid</span>
+              <span className="legend-value">{lowMidThreshold}-{midHighThreshold}%</span>
+            </div>
+          </div>
+          <div className="legend-item">
+            <div className="color-swatch red"></div>
+            <div className="legend-text">
+              <span className="legend-label">High</span>
+              <span className="legend-value">{midHighThreshold}-100%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Visualization Controls */}
+        <div className="visualization-controls">
+          <div className="control-section">
+            <h3>Color Thresholds</h3>
+            <div className="threshold-controls">
+              <div className="control-group">
+                <label>Blue → Green:</label>
+                <input 
+                  type="range" 
+                  min="10" 
+                  max="90" 
+                  value={lowMidThreshold} 
+                  onChange={(e) => setLowMidThreshold(Number(e.target.value))} 
+                />
+                <span>{lowMidThreshold}%</span>
+              </div>
+              <div className="control-group">
+                <label>Green → Red:</label>
+                <input 
+                  type="range" 
+                  min="10" 
+                  max="90" 
+                  value={midHighThreshold} 
+                  onChange={(e) => setMidHighThreshold(Number(e.target.value))} 
+                />
+                <span>{midHighThreshold}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="control-section">
+            <h3>Sensitivity Controls</h3>
+            <div className="sensitivity-controls">
+              <div className="control-group">
+                <label>Global Scaling:</label>
+                <input 
+                  type="range" 
+                  min="0.5" 
+                  max="2" 
+                  step="0.1"
+                  value={globalScaling} 
+                  onChange={(e) => setGlobalScaling(Number(e.target.value))} 
+                />
+                <span>{globalScaling.toFixed(1)}x</span>
+              </div>
+              <div className="control-group">
+                <label>C0 Sensitivity:</label>
+                <input 
+                  type="range" 
+                  min="100" 
+                  max="1000" 
+                  value={sensitivityC0} 
+                  onChange={(e) => setSensitivityC0(Number(e.target.value))} 
+                />
+                <span>{sensitivityC0}</span>
+              </div>
+              <div className="control-group">
+                <label>C1 Sensitivity:</label>
+                <input 
+                  type="range" 
+                  min="50" 
+                  max="300" 
+                  value={sensitivityC1} 
+                  onChange={(e) => setSensitivityC1(Number(e.target.value))} 
+                />
+                <span>{sensitivityC1}</span>
+              </div>
+              <div className="control-group">
+                <label>C2-C12 Sensitivity:</label>
+                <input 
+                  type="range" 
+                  min="10" 
+                  max="150" 
+                  value={sensitivityOthers} 
+                  onChange={(e) => setSensitivityOthers(Number(e.target.value))} 
+                />
+                <span>{sensitivityOthers}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* WebGL spectrogram canvas */}
         <div className="spectrogram-container">
@@ -263,7 +480,7 @@ function App() {
             height={260}
           />
         </div>
-        
+
         {/* Channel labels */}
         <div className="channel-labels">
           {Array.from({ length: 13 }, (_, i) => (
