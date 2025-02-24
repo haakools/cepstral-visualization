@@ -1,50 +1,130 @@
-.container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
+/* Updated styles for Cepstral Coefficient Visualization */
+
+/* Body and global styles */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #1e1e1e;
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
-.spectrogram {
+/* App container (full width) */
+.app-container {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  height: 400px;
-  background: #f5f5f5;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Content container (centered, max-width) */
+.content-container {
+  width: 100%;
+  max-width: 1200px;
   padding: 20px;
-  border-radius: 8px;
+  box-sizing: border-box;
 }
 
-.bar-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  width: 40px;
+/* Heading */
+h1 {
+  font-size: 28px;
+  margin-bottom: 20px;
+  text-align: center;
 }
 
-.bar {
-  width: 20px;
-  background: #2196f3;
-  transition: height 0.1s ease-out;
-  border-radius: 2px 2px 0 0;
-}
-
-.label {
-  margin-top: 10px;
-  font-size: 12px;
-}
-
+/* Control button */
 .control-button {
-  display: block;
-  margin: 20px auto;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
-  background: #2196f3;
+  background-color: #2196f3;
   color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 16px;
   cursor: pointer;
+  transition: background-color 0.2s;
+  font-weight: 500;
+  display: block;
+  margin: 0 auto 20px auto;
+  min-width: 120px;
 }
 
 .control-button:hover {
-  background: #1976d2;
+  background-color: #1976d2;
+}
+
+.control-button:active {
+  background-color: #0d47a1;
+}
+
+/* Error message */
+.error-message {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  padding: 10px 15px;
+  margin: 15px auto;
+  border-radius: 4px;
+  border-left: 4px solid #dc3545;
+  font-size: 14px;
+  max-width: 600px;
+}
+
+/* Spectrogram container */
+.spectrogram-container {
+  width: 100%;
+  margin: 0 auto 5px auto;
+  border: 1px solid #444;
+  background-color: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Canvas */
+.spectrogram-canvas {
+  width: 100%;
+  height: 260px; /* Height for exactly 13 channels (20px per channel) */
+  display: block;
+}
+
+/* Channel labels */
+.channel-labels {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 40px;
+  height: 260px;
+  margin-top: -260px; /* Overlay on the canvas height */
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.channel-label {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  padding-left: 5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .content-container {
+    padding: 10px;
+  }
+  
+  h1 {
+    font-size: 24px;
+  }
+  
+  .spectrogram-canvas {
+    height: 200px;
+  }
+  
+  .channel-labels {
+    height: 200px;
+    margin-top: -200px;
+  }
+  
+  .channel-label {
+    height: 15.38px;
+  }
 }
